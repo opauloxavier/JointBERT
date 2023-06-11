@@ -28,7 +28,8 @@ def load_model(pred_config, args, device):
     try:
         model = MODEL_CLASSES[args.model_type][1].from_pretrained(args.model_dir,
                                                                   args=args,
-                                                                  intent_label_lst=get_intent_labels(args),
+                                                                  intent_label_lst=get_intent_labels(
+                                                                      args),
                                                                   slot_label_lst=get_slot_labels(args))
         model.to(device)
         model.eval()
@@ -46,7 +47,6 @@ def read_input_file(pred_config):
             line = line.strip()
             words = line.split()
             lines.append(words)
-
     return lines
 
 
@@ -79,13 +79,15 @@ def convert_input_file_to_tensor_dataset(lines,
                 word_tokens = [unk_token]  # For handling the bad-encoded word
             tokens.extend(word_tokens)
             # Use the real label id for the first token of the word, and padding ids for the remaining tokens
-            slot_label_mask.extend([pad_token_label_id + 1] + [pad_token_label_id] * (len(word_tokens) - 1))
+            slot_label_mask.extend(
+                [pad_token_label_id + 1] + [pad_token_label_id] * (len(word_tokens) - 1))
 
         # Account for [CLS] and [SEP]
-        special_tokens_count = 2
+        special_tokens_count = 8
         if len(tokens) > args.max_seq_len - special_tokens_count:
             tokens = tokens[: (args.max_seq_len - special_tokens_count)]
-            slot_label_mask = slot_label_mask[:(args.max_seq_len - special_tokens_count)]
+            slot_label_mask = slot_label_mask[:(
+                args.max_seq_len - special_tokens_count)]
 
         # Add [SEP] token
         tokens += [sep_token]
@@ -105,9 +107,12 @@ def convert_input_file_to_tensor_dataset(lines,
         # Zero-pad up to the sequence length.
         padding_length = args.max_seq_len - len(input_ids)
         input_ids = input_ids + ([pad_token_id] * padding_length)
-        attention_mask = attention_mask + ([0 if mask_padding_with_zero else 1] * padding_length)
-        token_type_ids = token_type_ids + ([pad_token_segment_id] * padding_length)
-        slot_label_mask = slot_label_mask + ([pad_token_label_id] * padding_length)
+        attention_mask = attention_mask + \
+            ([0 if mask_padding_with_zero else 1] * padding_length)
+        token_type_ids = token_type_ids + \
+            ([pad_token_segment_id] * padding_length)
+        slot_label_mask = slot_label_mask + \
+            ([pad_token_label_id] * padding_length)
 
         all_input_ids.append(input_ids)
         all_attention_mask.append(attention_mask)
@@ -120,7 +125,8 @@ def convert_input_file_to_tensor_dataset(lines,
     all_token_type_ids = torch.tensor(all_token_type_ids, dtype=torch.long)
     all_slot_label_mask = torch.tensor(all_slot_label_mask, dtype=torch.long)
 
-    dataset = TensorDataset(all_input_ids, all_attention_mask, all_token_type_ids, all_slot_label_mask)
+    dataset = TensorDataset(all_input_ids, all_attention_mask,
+                            all_token_type_ids, all_slot_label_mask)
 
     return dataset
 
@@ -139,11 +145,13 @@ def predict(pred_config):
     pad_token_label_id = args.ignore_index
     tokenizer = load_tokenizer(args)
     lines = read_input_file(pred_config)
-    dataset = convert_input_file_to_tensor_dataset(lines, pred_config, args, tokenizer, pad_token_label_id)
+    dataset = convert_input_file_to_tensor_dataset(
+        lines, pred_config, args, tokenizer, pad_token_label_id)
 
     # Predict
     sampler = SequentialSampler(dataset)
-    data_loader = DataLoader(dataset, sampler=sampler, batch_size=pred_config.batch_size)
+    data_loader = DataLoader(dataset, sampler=sampler,
+                             batch_size=pred_config.batch_size)
 
     all_slot_label_mask = None
     intent_preds = None
@@ -165,7 +173,8 @@ def predict(pred_config):
             if intent_preds is None:
                 intent_preds = intent_logits.detach().cpu().numpy()
             else:
-                intent_preds = np.append(intent_preds, intent_logits.detach().cpu().numpy(), axis=0)
+                intent_preds = np.append(
+                    intent_preds, intent_logits.detach().cpu().numpy(), axis=0)
 
             # Slot prediction
             if slot_preds is None:
@@ -177,10 +186,13 @@ def predict(pred_config):
                 all_slot_label_mask = batch[3].detach().cpu().numpy()
             else:
                 if args.use_crf:
-                    slot_preds = np.append(slot_preds, np.array(model.crf.decode(slot_logits)), axis=0)
+                    slot_preds = np.append(slot_preds, np.array(
+                        model.crf.decode(slot_logits)), axis=0)
                 else:
-                    slot_preds = np.append(slot_preds, slot_logits.detach().cpu().numpy(), axis=0)
-                all_slot_label_mask = np.append(all_slot_label_mask, batch[3].detach().cpu().numpy(), axis=0)
+                    slot_preds = np.append(
+                        slot_preds, slot_logits.detach().cpu().numpy(), axis=0)
+                all_slot_label_mask = np.append(
+                    all_slot_label_mask, batch[3].detach().cpu().numpy(), axis=0)
 
     intent_preds = np.argmax(intent_preds, axis=1)
 
@@ -200,11 +212,9 @@ def predict(pred_config):
         for words, slot_preds, intent_pred in zip(lines, slot_preds_list, intent_preds):
             line = ""
             for word, pred in zip(words, slot_preds):
-                if pred == 'O':
-                    line = line + word + " "
-                else:
-                    line = line + "[{}:{}] ".format(word, pred)
-            f.write("<{}> -> {}\n".format(intent_label_lst[intent_pred], line.strip()))
+                line = line + "[{}:{}] ".format(word, pred)
+            f.write(
+                "<{}> -> {}\n".format(intent_label_lst[intent_pred], line.strip()))
 
     logger.info("Prediction Done!")
 
@@ -213,12 +223,17 @@ if __name__ == "__main__":
     init_logger()
     parser = argparse.ArgumentParser()
 
-    parser.add_argument("--input_file", default="sample_pred_in.txt", type=str, help="Input file for prediction")
-    parser.add_argument("--output_file", default="sample_pred_out.txt", type=str, help="Output file for prediction")
-    parser.add_argument("--model_dir", default="./atis_model", type=str, help="Path to save, load model")
+    parser.add_argument("--input_file", default="sample_pred_in.txt",
+                        type=str, help="Input file for prediction")
+    parser.add_argument("--output_file", default="sample_pred_out.txt",
+                        type=str, help="Output file for prediction")
+    parser.add_argument("--model_dir", default="./atis_model",
+                        type=str, help="Path to save, load model")
 
-    parser.add_argument("--batch_size", default=32, type=int, help="Batch size for prediction")
-    parser.add_argument("--no_cuda", action="store_true", help="Avoid using CUDA when available")
+    parser.add_argument("--batch_size", default=32, type=int,
+                        help="Batch size for prediction")
+    parser.add_argument("--no_cuda", action="store_true",
+                        help="Avoid using CUDA when available")
 
     pred_config = parser.parse_args()
     predict(pred_config)

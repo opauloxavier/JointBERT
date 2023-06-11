@@ -88,19 +88,24 @@ class JointProcessor(object):
     def _create_examples(self, texts, intents, slots, set_type):
         """Creates examples for the training and dev sets."""
         examples = []
+
         for i, (text, intent, slot) in enumerate(zip(texts, intents, slots)):
             guid = "%s-%s" % (set_type, i)
             # 1. input_text
             words = text.split()  # Some are spaced twice
             # 2. intent
-            intent_label = self.intent_labels.index(intent) if intent in self.intent_labels else self.intent_labels.index("UNK")
+            intent_label = self.intent_labels.index(
+                intent) if intent in self.intent_labels else self.intent_labels.index("UNK")
+
             # 3. slot
             slot_labels = []
             for s in slot.split():
-                slot_labels.append(self.slot_labels.index(s) if s in self.slot_labels else self.slot_labels.index("UNK"))
+                slot_labels.append(self.slot_labels.index(
+                    s) if s in self.slot_labels else self.slot_labels.index("UNK"))
 
             assert len(words) == len(slot_labels)
-            examples.append(InputExample(guid=guid, words=words, intent_label=intent_label, slot_labels=slot_labels))
+            examples.append(InputExample(guid=guid, words=words,
+                            intent_label=intent_label, slot_labels=slot_labels))
         return examples
 
     def get_examples(self, mode):
@@ -111,12 +116,15 @@ class JointProcessor(object):
         data_path = os.path.join(self.args.data_dir, self.args.task, mode)
         logger.info("LOOKING AT {}".format(data_path))
         return self._create_examples(texts=self._read_file(os.path.join(data_path, self.input_text_file)),
-                                     intents=self._read_file(os.path.join(data_path, self.intent_label_file)),
-                                     slots=self._read_file(os.path.join(data_path, self.slot_labels_file)),
+                                     intents=self._read_file(os.path.join(
+                                         data_path, self.intent_label_file)),
+                                     slots=self._read_file(os.path.join(
+                                         data_path, self.slot_labels_file)),
                                      set_type=mode)
 
 
 processors = {
+    "conda": JointProcessor,
     "atis": JointProcessor,
     "snips": JointProcessor
 }
@@ -148,13 +156,15 @@ def convert_examples_to_features(examples, max_seq_len, tokenizer,
                 word_tokens = [unk_token]  # For handling the bad-encoded word
             tokens.extend(word_tokens)
             # Use the real label id for the first token of the word, and padding ids for the remaining tokens
-            slot_labels_ids.extend([int(slot_label)] + [pad_token_label_id] * (len(word_tokens) - 1))
+            slot_labels_ids.extend(
+                [int(slot_label)] + [pad_token_label_id] * (len(word_tokens) - 1))
 
         # Account for [CLS] and [SEP]
         special_tokens_count = 2
         if len(tokens) > max_seq_len - special_tokens_count:
             tokens = tokens[:(max_seq_len - special_tokens_count)]
-            slot_labels_ids = slot_labels_ids[:(max_seq_len - special_tokens_count)]
+            slot_labels_ids = slot_labels_ids[:(
+                max_seq_len - special_tokens_count)]
 
         # Add [SEP] token
         tokens += [sep_token]
@@ -175,14 +185,21 @@ def convert_examples_to_features(examples, max_seq_len, tokenizer,
         # Zero-pad up to the sequence length.
         padding_length = max_seq_len - len(input_ids)
         input_ids = input_ids + ([pad_token_id] * padding_length)
-        attention_mask = attention_mask + ([0 if mask_padding_with_zero else 1] * padding_length)
-        token_type_ids = token_type_ids + ([pad_token_segment_id] * padding_length)
-        slot_labels_ids = slot_labels_ids + ([pad_token_label_id] * padding_length)
+        attention_mask = attention_mask + \
+            ([0 if mask_padding_with_zero else 1] * padding_length)
+        token_type_ids = token_type_ids + \
+            ([pad_token_segment_id] * padding_length)
+        slot_labels_ids = slot_labels_ids + \
+            ([pad_token_label_id] * padding_length)
 
-        assert len(input_ids) == max_seq_len, "Error with input length {} vs {}".format(len(input_ids), max_seq_len)
-        assert len(attention_mask) == max_seq_len, "Error with attention mask length {} vs {}".format(len(attention_mask), max_seq_len)
-        assert len(token_type_ids) == max_seq_len, "Error with token type length {} vs {}".format(len(token_type_ids), max_seq_len)
-        assert len(slot_labels_ids) == max_seq_len, "Error with slot labels length {} vs {}".format(len(slot_labels_ids), max_seq_len)
+        assert len(input_ids) == max_seq_len, "Error with input length {} vs {}".format(
+            len(input_ids), max_seq_len)
+        assert len(attention_mask) == max_seq_len, "Error with attention mask length {} vs {}".format(
+            len(attention_mask), max_seq_len)
+        assert len(token_type_ids) == max_seq_len, "Error with token type length {} vs {}".format(
+            len(token_type_ids), max_seq_len)
+        assert len(slot_labels_ids) == max_seq_len, "Error with slot labels length {} vs {}".format(
+            len(slot_labels_ids), max_seq_len)
 
         intent_label_id = int(example.intent_label)
 
@@ -190,11 +207,16 @@ def convert_examples_to_features(examples, max_seq_len, tokenizer,
             logger.info("*** Example ***")
             logger.info("guid: %s" % example.guid)
             logger.info("tokens: %s" % " ".join([str(x) for x in tokens]))
-            logger.info("input_ids: %s" % " ".join([str(x) for x in input_ids]))
-            logger.info("attention_mask: %s" % " ".join([str(x) for x in attention_mask]))
-            logger.info("token_type_ids: %s" % " ".join([str(x) for x in token_type_ids]))
-            logger.info("intent_label: %s (id = %d)" % (example.intent_label, intent_label_id))
-            logger.info("slot_labels: %s" % " ".join([str(x) for x in slot_labels_ids]))
+            logger.info("input_ids: %s" %
+                        " ".join([str(x) for x in input_ids]))
+            logger.info("attention_mask: %s" %
+                        " ".join([str(x) for x in attention_mask]))
+            logger.info("token_type_ids: %s" %
+                        " ".join([str(x) for x in token_type_ids]))
+            logger.info("intent_label: %s (id = %d)" %
+                        (example.intent_label, intent_label_id))
+            logger.info("slot_labels: %s" % " ".join(
+                [str(x) for x in slot_labels_ids]))
 
         features.append(
             InputFeatures(input_ids=input_ids,
@@ -209,7 +231,7 @@ def convert_examples_to_features(examples, max_seq_len, tokenizer,
 
 def load_and_cache_examples(args, tokenizer, mode):
     processor = processors[args.task](args)
-
+    print(args.data_dir, tokenizer, mode)
     # Load data features from cache or dataset file
     cached_features_file = os.path.join(
         args.data_dir,
@@ -222,7 +244,8 @@ def load_and_cache_examples(args, tokenizer, mode):
     )
 
     if os.path.exists(cached_features_file):
-        logger.info("Loading features from cached file %s", cached_features_file)
+        logger.info("Loading features from cached file %s",
+                    cached_features_file)
         features = torch.load(cached_features_file)
     else:
         # Load data features from dataset file
@@ -240,15 +263,21 @@ def load_and_cache_examples(args, tokenizer, mode):
         pad_token_label_id = args.ignore_index
         features = convert_examples_to_features(examples, args.max_seq_len, tokenizer,
                                                 pad_token_label_id=pad_token_label_id)
-        logger.info("Saving features into cached file %s", cached_features_file)
+        logger.info("Saving features into cached file %s",
+                    cached_features_file)
         torch.save(features, cached_features_file)
 
     # Convert to Tensors and build dataset
-    all_input_ids = torch.tensor([f.input_ids for f in features], dtype=torch.long)
-    all_attention_mask = torch.tensor([f.attention_mask for f in features], dtype=torch.long)
-    all_token_type_ids = torch.tensor([f.token_type_ids for f in features], dtype=torch.long)
-    all_intent_label_ids = torch.tensor([f.intent_label_id for f in features], dtype=torch.long)
-    all_slot_labels_ids = torch.tensor([f.slot_labels_ids for f in features], dtype=torch.long)
+    all_input_ids = torch.tensor(
+        [f.input_ids for f in features], dtype=torch.long)
+    all_attention_mask = torch.tensor(
+        [f.attention_mask for f in features], dtype=torch.long)
+    all_token_type_ids = torch.tensor(
+        [f.token_type_ids for f in features], dtype=torch.long)
+    all_intent_label_ids = torch.tensor(
+        [f.intent_label_id for f in features], dtype=torch.long)
+    all_slot_labels_ids = torch.tensor(
+        [f.slot_labels_ids for f in features], dtype=torch.long)
 
     dataset = TensorDataset(all_input_ids, all_attention_mask,
                             all_token_type_ids, all_intent_label_ids, all_slot_labels_ids)
